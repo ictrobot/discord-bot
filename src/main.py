@@ -108,5 +108,15 @@ async def purge(ctx, num: int, timeString: str):
         await ctx.send("Cancelled purge")
 
 
+@bot.command(brief="Deletes message after a short time period", aliases=["tmp"])
+async def temp(ctx, *message):
+    await ctx.message.add_reaction("🕑")
+    await asyncio.sleep(TMP_CHANNEL_TIME - 5)
+    for symbol in ["5⃣", "4⃣", "3⃣", "2⃣", "1⃣"]:
+        await ctx.message.add_reaction(symbol)
+        await asyncio.sleep(1)
+        await ctx.message.remove_reaction(symbol, bot.user)
+    await ctx.message.delete()
+
 with open("../token.txt", "r") as tokenFile:
     bot.run(tokenFile.read().strip(), bot=True)
