@@ -226,7 +226,7 @@ async def endpoll(poll, message):
                 user_vote_count[u] += 1
 
         for u, count in user_vote_count.items():
-            if count > 0:
+            if count > 1:
                 not_counted.append(u)
 
         for u in not_counted:
