@@ -8,10 +8,10 @@ from discord.ext import commands
 TIME_PERIODS = {"m": 60, "minute": 60, "minutes": 60, "h": 3600, "hour": 3600, "hours": 3600, "d": 86400, "day": 86400, "days": 86400}
 
 TMP_CHANNEL_NAME = "tmp-msg"
-TMP_CHANNEL_TIME = 120
+TMP_CHANNEL_TIME = 60
 
 # https://github.com/Rapptz/discord.py/blob/rewrite/examples/basic_bot.py
-description = '''Testing'''
+description = '''General usual bot\n\nSource: https://github.com/ictrobot/discord-bot/'''
 bot = commands.Bot(command_prefix='!', description=description, game=discord.Game(name="Server Management"))
 
 
@@ -83,8 +83,8 @@ async def purge(ctx, num: int, timeString: str):
         await ctx.send("{} isn't a valid time period".format(timeString))
         return
     seconds = num * TIME_PERIODS[timeString]
-    if seconds > 31 * 24 * 60 * 60:
-        await ctx.send("Maximum purge length is 31 days")
+    if seconds > 3 * 24 * 60 * 60:
+        await ctx.send("Maximum purge length is 3 days")
         return
     if ctx.channel.name == TMP_CHANNEL_NAME:
         await ctx.send("That doesn't make sense here...")
