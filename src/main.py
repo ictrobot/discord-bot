@@ -5,6 +5,7 @@ import discord
 import humanfriendly
 from discord.ext import commands
 
+NUMBERS = ["1⃣", "2⃣", "3⃣", "4⃣", "5⃣", "6⃣", "7⃣", "8⃣", "9⃣"]
 TIME_PERIODS = {"m": 60, "minute": 60, "minutes": 60, "h": 3600, "hour": 3600, "hours": 3600, "d": 86400, "day": 86400, "days": 86400}
 
 TMP_CHANNEL_NAME = "tmp-msg"
@@ -14,6 +15,7 @@ TMP_CHANNEL_TIME = 60
 description = '''General usual bot\n\nSource: https://github.com/ictrobot/discord-bot/'''
 bot = commands.Bot(command_prefix='!', description=description, game=discord.Game(name="Server Management"))
 
+POLLS = []
 
 @bot.event
 async def on_ready():
@@ -150,6 +152,64 @@ async def temp(ctx, *message):
         await asyncio.sleep(1)
         await ctx.message.remove_reaction(symbol, bot.user)
     await ctx.message.delete()
+
+
+@bot.command(brief="Run a poll")
+async def poll(ctx, title, *options):
+    if len(options) < 2:
+        await ctx.send("There must be at least 2 options")
+        return
+    if len(options) > 9:
+        await ctx.send("There must be less than 10 options")
+        return
+    message = await ctx.send("Poll from {}:\n`{}`\n\n".format(ctx.author.mention, title) + "\n".join("{} - `{}`".format(n, o) for n, o in zip(NUMBERS, options)) + "\n\n*To vote click the corresponding number reaction. {} can click ⛔ to end the poll*".format(ctx.author.mention))
+    await message.add_reaction("📄")
+    for n in NUMBERS[:len(options)]:
+        await message.add_reaction(n)
+    await message.add_reaction("📝")
+    await message.add_reaction("⛔")
+    POLLS.insert(0, {"user": ctx.author.id, "channel": ctx.message.channel.id, "message": message.id, "title": title, "options": options})
+
+
+@bot.event
+async def on_reaction_add(reaction, user):
+    if user and str(reaction) == "⛔" and reaction.message.author == bot.user and reaction.message.content.startswith("Poll from "):
+        poll = None
+        for check in POLLS:
+            if check["channel"] == reaction.message.channel.id and check["message"] == reaction.message.id:
+                poll = check
+                break
+        if poll and poll["user"] == user.id:
+            POLLS.remove(poll)
+            await endpoll(poll, reaction.message)
+
+
+async def endpoll(poll, message):
+    response = "Results from {}'s poll:\n`{}`\n\n".format(message.channel.guild.get_member(poll["user"]).mention, poll["title"])
+
+    results = []
+    for i, (n, o) in enumerate(zip(NUMBERS, poll["options"])):
+        for r in message.reactions:
+            if str(r) == n:
+                users = []
+                async for user in r.users():
+                    if user != bot.user:
+                        users.append(user)
+                results.append((i, n, o, users))
+                break
+    results.sort(key=lambda x: (-len(x[3]), x[0]))
+
+    for i, n, o, users in results:
+        response += "{} - `{}`\n".format(n, o)
+        if len(users) == 0:
+            response += "No votes\n"
+        else:
+            response += "{} votes:\n".format(len(users))
+        for user in users:
+            response += "- {}\n".format(user.mention)
+    await message.channel.send(response)
+    await message.delete()
+
 
 with open("../token.txt", "r") as tokenFile:
     bot.run(tokenFile.read().strip(), bot=True)
