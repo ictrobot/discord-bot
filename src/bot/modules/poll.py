@@ -1,5 +1,6 @@
 from bot.module import *
 from collections import defaultdict
+import humanfriendly
 
 NUMBERS = ["1⃣", "2⃣", "3⃣", "4⃣", "5⃣", "6⃣", "7⃣", "8⃣", "9⃣"]
 
@@ -93,7 +94,7 @@ class PollCommand(Module):
             if len(users) == 0:
                 response += "No votes\n"
             else:
-                response += "{} votes:\n".format(len(users))
+                response += "{}:\n".format(humanfriendly.pluralize(len(users), "vote"))
             for user in users:
                 response += "- {}\n".format(user.mention)
 

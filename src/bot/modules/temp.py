@@ -19,7 +19,7 @@ class TempCommand(Module):
             await ctx.message.add_reaction(symbol)
             await asyncio.sleep(1)
             await ctx.message.remove_reaction(symbol, self.bot.user)
-        await ctx.message.delete()
+        await safe_delete(ctx.message)
 
 
 class TempChannel(Module):
@@ -31,11 +31,7 @@ class TempChannel(Module):
     async def on_message(self, message):
         if isinstance(message.channel, discord.TextChannel) and message.channel.name == TMP_CHANNEL_NAME:
             await asyncio.sleep(TMP_TIME)
-            try:
-                if not message.pinned:
-                    await message.delete()
-            except:
-                pass
+            await safe_delete(message.delete())
             return True
 
     @add_event_handler(1)

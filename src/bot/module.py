@@ -1,6 +1,7 @@
 import logging
 import asyncio
 import discord
+import discord.errors
 import inspect
 
 
@@ -29,6 +30,13 @@ def channel_name(channel):
         return "@" + channel.recipient.name
     elif isinstance(channel, discord.GroupChannel):
         return channel.name if channel.name else ",".join("@" + x.user.name for x in channel.recipients)
+
+
+async def safe_delete(msg):
+    try:
+        await msg.delete()
+    except discord.errors.NotFound:
+        pass
 
 
 class Module:

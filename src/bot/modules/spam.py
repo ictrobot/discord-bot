@@ -18,7 +18,7 @@ class SpamModule(Module):
             if previous_message.content == warning_msg:
                 warning_present = True
         if appearances >= 4:
-            await message.delete()
+            await safe_delete(message)
             if not warning_present:
                 await message.channel.send(warning_msg)
             return True

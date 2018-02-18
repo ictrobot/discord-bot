@@ -4,65 +4,46 @@ from bot.module import *
 import humanfriendly
 import datetime
 
-TIME_PERIODS = {"m": 60, "minute": 60, "minutes": 60, "h": 3600, "hour": 3600, "hours": 3600, "d": 86400, "day": 86400, "days": 86400}
-
 
 class PurgeCommand(Module):
 
     def __init__(self, instance):
         super().__init__(instance, "purge")
 
-    @add_command(brief="Purges messages", description="Purges messages. Maximum purge length is 3 days. Examples: '!purge 1 hour', '!purge 2 days'")
-    async def purge(self, ctx, num: int, time_string: str):
-        if not ctx.channel.permissions_for(ctx.author).administrator:
-            await ctx.send("You must be an administrator to do this")
+    @add_command(brief="Purges messages", description="Purges messages. Maximum purge length is 3 days. Examples: '!purge 1h', '!purge 2sec', '!purge 3days'")
+    async def purge(self, ctx, time_period: humanfriendly.parse_timespan):
+        if not ctx.channel.permissions_for(ctx.author).manage_messages:
+            await ctx.send("You must have permissions to delete messages in the channel to do this")
             return
-        if time_string not in TIME_PERIODS:
-            raise BadArgument("{} isn't a valid time period".format(time_string))
-        seconds = num * TIME_PERIODS[time_string]
-        if seconds > 3 * 24 * 60 * 60:
+        if time_period > 3 * 24 * 60 * 60:
             raise BadArgument("Maximum purge length is 3 days")
-        confirm_message = "{}: Are you sure you want to purge messages sent in the last {}?".format(ctx.author.mention, humanfriendly.format_timespan(seconds))
-        if await self.confirm(ctx, confirm_message):
-            await ctx.send("Purging")
-            start_time = datetime.datetime.now() - datetime.timedelta(seconds=seconds)
 
-            async def messages_left():
-                async for m in ctx.channel.history(limit=1):
-                    return m.created_at > start_time
-                return False
+        message = ctx.author.mention + ": {} all messages sent in the last " + humanfriendly.format_timespan(time_period) + "{}"
+        await self._do_purge(ctx, time_period, message)
 
-            with ctx.channel.typing():
-                while await messages_left():
-                    await ctx.channel.purge(limit=1000, after=start_time)
-
-            await ctx.send("{}: successfully purged all messages sent in the last {}".format(ctx.author.mention, humanfriendly.format_timespan(seconds)))
-        else:
-            await ctx.send("Cancelled purge")
-
-    @add_command(brief="Purges messages from one user", description="Purges messages from one user. Maximum length is 31 days. Examples: '!purgeuser @user 1 hour', '!purgeuser @user 2 days'")
-    async def purgeuser(self, ctx, user: discord.Member, num: int, time_string: str):
-        if not ctx.channel.permissions_for(ctx.author).administrator:
-            await ctx.send("You must be an administrator to do this")
+    @add_command(brief="Purges messages from one user", description="Purges messages from one user. Maximum length is 31 days. Examples: '!purgeuser @user 1hour', '!purgeuser @user 2days'")
+    async def purgeuser(self, ctx, user: discord.Member, time_period: humanfriendly.parse_timespan):
+        if not ctx.channel.permissions_for(ctx.author).manage_messages:
+            await ctx.send("You must have permissions to delete messages in the channel to do this")
             return
         if ctx.channel.permissions_for(user).administrator and user != self.bot.user:
             raise BadArgument("The messages of an administrator can not be deleted")
-        if time_string not in TIME_PERIODS:
-            raise BadArgument("{} isn't a valid time period".format(time_string))
-        seconds = num * TIME_PERIODS[time_string]
-        if seconds > 31 * 24 * 60 * 60:
+        if time_period > 31 * 24 * 60 * 60:
             await ctx.send("Maximum purge user length is 31 days")
             return
-        confirm_message = "{}: Are you sure you want to purge messages sent by {} in the last {}?".format(ctx.author.mention, user.mention, humanfriendly.format_timespan(seconds))
-        if await self.confirm(ctx, confirm_message):
-            await ctx.send("Purging")
-            start_time = datetime.datetime.now() - datetime.timedelta(seconds=seconds)
 
-            def check_message(message):
-                return message.author == user
+        message = ctx.author.mention + ": {} all messages sent by " + user.mention + " in the last " + humanfriendly.format_timespan(time_period) + "{}"
+        await self._do_purge(ctx, time_period, message, lambda x: x.author == user)
 
-            await ctx.channel.purge(limit=10000, after=start_time, check=check_message)
+    async def _do_purge(self, ctx, time_period, message, check=None):
+        if await self.confirm(ctx, message.format("Are you sure you want to purge", "?")):
+            in_progress = await ctx.send(message.format("Purging", "!"))
+            start_time = datetime.datetime.now() - datetime.timedelta(seconds=time_period)
 
-            await ctx.send("{}: successfully purged all messages sent by {} in the last {}".format(ctx.author.mention, user.mention, humanfriendly.format_timespan(seconds)))
+            with ctx.channel.typing():
+                await ctx.channel.purge(limit=None, after=start_time, check=check)
+
+            await safe_delete(in_progress)
+            await ctx.send(message.format("Successfully purged", "."))
         else:
-            await ctx.send("Cancelled purge of {}'s messages".format(user.mention))
+            await ctx.send(message.format("Cancelled purge of", "."))
