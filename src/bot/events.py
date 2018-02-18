@@ -1,3 +1,7 @@
+from discord.ext.commands.errors import BadArgument, MissingRequiredArgument
+import asyncio
+
+
 class EventRegistry:
 
     def __init__(self, instance):
@@ -5,6 +9,7 @@ class EventRegistry:
 
         self.add_handler(self._on_message_process_commands, 1000, event_name="on_message")
         self.add_handler(self._on_ready_log, 1000, event_name="on_ready")
+        self.add_handler(self._on_command_error, 1000, event_name="on_command_error")
 
     def add_handler(self, handler, priority, event_name=None):
         if not event_name:
@@ -34,3 +39,22 @@ class EventRegistry:
 
     async def _on_ready_log(self):
         self.instance.logger.info('Successfully logged in. Name: "{0.name}". ID: {0.id}'.format(self.instance.discord_bot.user))
+
+    async def _on_command_error(self, ctx, error):
+        to_delete = []
+        if isinstance(error, BadArgument) or isinstance(error, MissingRequiredArgument):
+            command = next(filter(lambda x: x.name == ctx.invoked_with, ctx.bot.commands))
+
+            to_delete.append(await ctx.send("**Error:** *{}*\n*This message will delete automatically*".format(error.args[0])))
+            for page in await ctx.bot.formatter.format_help_for(ctx, command):
+                to_delete.append(await ctx.send(page))
+        else:
+            to_delete.append(await ctx.send("Unknown error occurred when processing command *{}*.\n*This message will delete automatically*".format(ctx.invoked_with)))
+            raise Exception("Command {} raised an exception".format(ctx.invoked_with)) from error
+
+        try:
+            if to_delete:
+                await asyncio.sleep(15)
+                await ctx.channel.delete_messages(to_delete)
+        except Exception as e:
+            pass

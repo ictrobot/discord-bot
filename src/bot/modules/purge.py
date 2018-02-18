@@ -1,3 +1,5 @@
+from discord.ext.commands import BadArgument
+
 from bot.module import *
 import humanfriendly
 import datetime
@@ -10,18 +12,16 @@ class PurgeCommand(Module):
     def __init__(self, instance):
         super().__init__(instance, "purge")
 
-    @add_command(brief="Purges messages", description="Purges messages. Examples: '!purge 1 hour', '!purge 2 days'")
+    @add_command(brief="Purges messages", description="Purges messages. Maximum purge length is 3 days. Examples: '!purge 1 hour', '!purge 2 days'")
     async def purge(self, ctx, num: int, time_string: str):
         if not ctx.channel.permissions_for(ctx.author).administrator:
             await ctx.send("You must be an administrator to do this")
             return
         if time_string not in TIME_PERIODS:
-            await ctx.send("{} isn't a valid time period".format(time_string))
-            return
+            raise BadArgument("{} isn't a valid time period".format(time_string))
         seconds = num * TIME_PERIODS[time_string]
         if seconds > 3 * 24 * 60 * 60:
-            await ctx.send("Maximum purge length is 3 days")
-            return
+            raise BadArgument("Maximum purge length is 3 days")
         confirm_message = "{}: Are you sure you want to purge messages sent in the last {}?".format(ctx.author.mention, humanfriendly.format_timespan(seconds))
         if await self.confirm(ctx, confirm_message):
             await ctx.send("Purging")
@@ -40,17 +40,15 @@ class PurgeCommand(Module):
         else:
             await ctx.send("Cancelled purge")
 
-    @add_command(brief="Purges messages from one user", description="Purges messages. Examples: '!purgeuser @user 1 hour', '!purgeuser @user 2 days'")
+    @add_command(brief="Purges messages from one user", description="Purges messages from one user. Maximum length is 31 days. Examples: '!purgeuser @user 1 hour', '!purgeuser @user 2 days'")
     async def purgeuser(self, ctx, user: discord.Member, num: int, time_string: str):
         if not ctx.channel.permissions_for(ctx.author).administrator:
             await ctx.send("You must be an administrator to do this")
             return
         if ctx.channel.permissions_for(user).administrator and user != self.bot.user:
-            await ctx.send("The messages of an administrator can not be deleted")
-            return
+            raise BadArgument("The messages of an administrator can not be deleted")
         if time_string not in TIME_PERIODS:
-            await ctx.send("{} isn't a valid time period".format(time_string))
-            return
+            raise BadArgument("{} isn't a valid time period".format(time_string))
         seconds = num * TIME_PERIODS[time_string]
         if seconds > 31 * 24 * 60 * 60:
             await ctx.send("Maximum purge user length is 31 days")
