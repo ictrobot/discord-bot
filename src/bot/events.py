@@ -1,4 +1,4 @@
-from discord.ext.commands.errors import BadArgument, MissingRequiredArgument
+from discord.ext.commands.errors import BadArgument, MissingRequiredArgument, CommandNotFound
 import asyncio
 
 
@@ -48,6 +48,8 @@ class EventRegistry:
             to_delete.append(await ctx.send("**Error:** *{}*\n*This message will delete automatically*".format(error.args[0])))
             for page in await ctx.bot.formatter.format_help_for(ctx, command):
                 to_delete.append(await ctx.send(page))
+        elif isinstance(error, CommandNotFound):
+            self.instance.logger.debug(error.args[0])
         else:
             to_delete.append(await ctx.send("Unknown error occurred when processing command *{}*.\n*This message will delete automatically*".format(ctx.invoked_with)))
             raise Exception("Command {} raised an exception".format(ctx.invoked_with)) from error
