@@ -5,6 +5,7 @@ import discord
 import humanfriendly
 from collections import defaultdict
 from discord.ext import commands
+from bot.setup_logging import logger
 
 NUMBERS = ["1⃣", "2⃣", "3⃣", "4⃣", "5⃣", "6⃣", "7⃣", "8⃣", "9⃣"]
 TIME_PERIODS = {"m": 60, "minute": 60, "minutes": 60, "h": 3600, "hour": 3600, "hours": 3600, "d": 86400, "day": 86400, "days": 86400}
@@ -18,9 +19,19 @@ bot = commands.Bot(command_prefix='!', description=description, game=discord.Gam
 
 POLLS = []
 
+
+def channel_name(channel):
+    if isinstance(channel, discord.TextChannel) or isinstance(channel, discord.VoiceChannel) or isinstance(channel, discord.CategoryChannel):
+        return channel.guild.name + "#" +channel.name
+    elif isinstance(channel, discord.DMChannel):
+        return "@" + channel.recipient.name
+    elif isinstance(channel, discord.GroupChannel):
+        return channel.name if channel.name else ",".join("@"+x.user.name for x in channel.recipients)
+
+
 @bot.event
 async def on_ready():
-    print('Successfully logged in. Name: "{}". ID: {}'.format(bot.user.name, bot.user.id))
+    logger.info('Successfully logged in. Name: "{}". ID: {}'.format(bot.user.name, bot.user.id))
     for channel in bot.get_all_channels():
         if channel.name == TMP_CHANNEL_NAME:
             async for message in channel.history(limit=1000):
@@ -51,7 +62,7 @@ async def on_message(message):
     if await ratelimit(message):
         return
     await bot.process_commands(message)
-    if message.channel.name == TMP_CHANNEL_NAME:
+    if isinstance(message.channel, discord.TextChannel) and message.channel.name == TMP_CHANNEL_NAME:
         await asyncio.sleep(TMP_CHANNEL_TIME)
         if not message.pinned:
             await message.delete()
