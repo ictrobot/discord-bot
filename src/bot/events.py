@@ -42,6 +42,7 @@ class EventRegistry:
 
     async def _on_command_error(self, ctx, error):
         to_delete = []
+        raise_error = False
         if isinstance(error, BadArgument) or isinstance(error, MissingRequiredArgument):
             command = next(filter(lambda x: x.name == ctx.invoked_with, ctx.bot.commands))
 
@@ -52,7 +53,7 @@ class EventRegistry:
             self.instance.logger.debug(error.args[0])
         else:
             to_delete.append(await ctx.send("Unknown error occurred when processing command *{}*.\n*This message will delete automatically*".format(ctx.invoked_with)))
-            raise Exception("Command {} raised an exception".format(ctx.invoked_with)) from error
+            raise_error = True
 
         try:
             if to_delete:
@@ -60,3 +61,5 @@ class EventRegistry:
                 await ctx.channel.delete_messages(to_delete)
         except Exception as e:
             pass
+        if raise_error:
+            raise Exception("Command {} raised an exception".format(ctx.invoked_with)) from error
