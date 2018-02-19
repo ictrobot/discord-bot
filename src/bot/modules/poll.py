@@ -1,15 +1,35 @@
 from bot.module import *
 from collections import defaultdict
+from peewee import *
 import humanfriendly
 
 NUMBERS = ["1⃣", "2⃣", "3⃣", "4⃣", "5⃣", "6⃣", "7⃣", "8⃣", "9⃣"]
 
 
+class Poll(Model):
+    message_id = IntegerField(primary_key=True)
+    user_id = IntegerField()
+    text = TextField()
+    multiple_answers = BooleanField()
+
+    class Meta:
+        database = Proxy()
+
+
+class PollOption(Model):
+    poll = ForeignKeyField(Poll, backref="options", on_delete="CASCADE")
+    num = IntegerField()
+    text = TextField()
+
+    class Meta:
+        primary_key = CompositeKey("poll", "num")
+        database = Proxy()
+
+
 class PollCommand(Module):
 
     def __init__(self, instance):
-        super().__init__(instance, "poll")
-        self.polls = []
+        super().__init__(instance, "poll", db_models=[Poll, PollOption])
 
     @add_command(brief="Run a poll")
     async def poll(self, ctx, title, *options):
@@ -42,26 +62,35 @@ class PollCommand(Module):
             await message.add_reaction(n)
         await message.add_reaction("📝")
         await message.add_reaction("⛔")
-        self.polls.insert(0, {"user": ctx.author.id, "channel": ctx.message.channel.id, "message": message.id, "title": title, "options": options, "multiple_answers": multiple_answers})
+
+        with self.instance.db.atomic() as transaction:
+            poll = Poll(message_id=message.id, user_id=ctx.author.id, text=title, multiple_answers=multiple_answers)
+            poll.save(force_insert=True)
+            for i, option in enumerate(options):
+                PollOption(poll=poll, num=i, text=option).save(force_insert=True)
 
     @add_event_handler(1)
-    async def on_reaction_add(self, reaction, user):
-        if user and str(reaction) == "⛔" and reaction.message.author == self.bot.user and reaction.message.content.startswith("Poll from "):
-            poll = None
-            for check in self.polls:
-                if check["channel"] == reaction.message.channel.id and check["message"] == reaction.message.id:
-                    poll = check
-                    break
-            if poll and poll["user"] == user.id:
-                self.polls.remove(poll)
-                await self.endpoll(poll, reaction.message)
-                return True
+    async def on_raw_reaction_add(self, emoji, message_id, channel_id, user_id):
+        if str(emoji) == "⛔" and user_id != self.bot.user.id:
+            channel = self.bot.get_channel(channel_id)
+            message = await channel.get_message(message_id)
+            if message.author == self.bot.user and message.content.startswith("Poll from "):
+                try:
+                    poll = Poll.get(Poll.message_id == message.id)
+                except DoesNotExist:
+                    return
+                if poll.user_id == user_id:
+                    options = [opt.text for opt in PollOption.select().where(PollOption.poll == poll).order_by(PollOption.num)]
+                    await self.endpoll(poll, self.bot.get_user(user_id), options, message)
+                    with self.instance.db.atomic() as transaction:
+                        Poll.delete().where(Poll.message_id == message_id).execute()
+                    return True
 
-    async def endpoll(self, poll, message):
-        response = "Results from {}'s poll:\n`{}`\n\n".format(message.channel.guild.get_member(poll["user"]).mention, poll["title"])
+    async def endpoll(self, poll, user, options, message):
+        response = "Results from {}'s poll:\n`{}`\n\n".format(user.mention, poll.text)
 
         results = []
-        for i, (n, o) in enumerate(zip(NUMBERS, poll["options"])):
+        for i, (n, o) in enumerate(zip(NUMBERS, options)):
             for r in message.reactions:
                 if str(r) == n:
                     users = []
@@ -72,7 +101,7 @@ class PollCommand(Module):
                     break
 
         not_counted = []
-        if not poll["multiple_answers"]:
+        if not poll.multiple_answers:
             user_vote_count = defaultdict(int)
             for r in results:
                 for u in r[3]:

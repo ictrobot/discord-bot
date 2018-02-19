@@ -40,9 +40,10 @@ async def safe_delete(msg):
 
 
 class Module:
-    def __init__(self, instance, group_name):
+    def __init__(self, instance, group_name, db_models=None):
         self.instance = instance
         self.bot = instance.discord_bot
+        self.db_models = db_models
         self.logger = logging.Logger("bot." + group_name)
         self.register()
 
@@ -61,6 +62,13 @@ class Module:
                     self.instance.event_registry.add_handler(method, f.ae_priority, event_name=f.ae_eventname)
             except AttributeError:
                 pass
+        if self.db_models:
+            for model in self.db_models:
+                try:
+                    model._meta.database.initialize(self.instance.db)
+                    model._meta.database = self.instance.db
+                except Exception as e:
+                    raise ValueError("Failed to initialize db for " + model.__class__.__name__) from e
 
     async def confirm(self, ctx, text):
         warning_msg = await ctx.send(text)

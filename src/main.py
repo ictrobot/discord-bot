@@ -6,6 +6,7 @@ from bot.setup_logging import logger
 from bot.events import EventRegistry
 from bot.modules import module_list
 from bot.module import Module
+from peewee import SqliteDatabase
 
 # https://github.com/Rapptz/discord.py/blob/rewrite/examples/basic_bot.py
 DESCRIPTION = '''Useful utilities\n\nSource: https://github.com/ictrobot/discord-bot/'''
@@ -18,7 +19,20 @@ class Instance:
         self.modules = {}
         self.discord_bot = commands.Bot(command_prefix='!', description=DESCRIPTION, game=discord.Game(name="Server Management"))
         self.event_registry = EventRegistry(self)
+        self.db = SqliteDatabase("../bot.db", pragmas=[('foreign_keys', 'on')])
         self.load_modules()
+        self.setup_db()
+
+    def setup_db(self):
+        models = []
+        for module in self.modules.values():
+            if module.db_models:
+                models += module.db_models
+        self.logger.debug("Trying to connect to DB")
+        self.db.connect()
+        self.logger.info("DB Tables: " + ", ".join(x.__name__ for x in models))
+        self.db.create_tables(models)
+        self.logger.info("Successfully connected to DB")
 
     def load_modules(self):
         found_modules = []
