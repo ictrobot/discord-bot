@@ -1,3 +1,4 @@
 git+https://github.com/Rapptz/discord.py@rewrite#egg=discord.py[voice]==1.0.0a1434+g355eb08
 humanfriendly==4.8
-peewee==3.0.18
+peewee==3.1.5
+imagehash==4.0
