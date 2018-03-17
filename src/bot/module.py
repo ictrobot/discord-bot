@@ -9,6 +9,8 @@ def add_command(*add_args, **add_kwargs):
     def wrapper(f):
         f.add_command = True
         f.ac_args = add_args
+        if "ignore_extra" not in add_kwargs:
+            add_kwargs["ignore_extra"] = False
         f.ac_kwargs = add_kwargs
         return f
     return wrapper

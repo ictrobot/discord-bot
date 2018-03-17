@@ -11,8 +11,8 @@ class TempCommand(Module):
     def __init__(self, instance):
         super().__init__(instance, "temp_command")
 
-    @add_command(brief="Deletes message after a short time period", aliases=["tmp"])
-    async def temp(self, ctx, *message):
+    @add_command(brief="Deletes message after a short time period", aliases=["tmp"], ignore_extra=True)
+    async def temp(self, ctx):
         await ctx.message.add_reaction("🕑")
         await asyncio.sleep(TMP_TIME - 5)
         for symbol in ["5⃣", "4⃣", "3⃣", "2⃣", "1⃣"]:
@@ -31,7 +31,7 @@ class TempChannel(Module):
     async def on_message(self, message):
         if isinstance(message.channel, discord.TextChannel) and message.channel.name == TMP_CHANNEL_NAME:
             await asyncio.sleep(TMP_TIME)
-            await safe_delete(message.delete())
+            await safe_delete(message)
             return True
 
     @add_event_handler(1)
