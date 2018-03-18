@@ -34,7 +34,7 @@ class SpamModule(Module):
         super().__init__(instance, "spam", db_models=[AttachmentHash, SpamWarning])
 
     async def ratelimit(self, message):
-        if message.author == self.bot.user or message.channel.permissions_for(message.author).administrator:
+        if message.author == self.bot.user or (message.channel.permissions_for(message.author).administrator and "!hash" not in message.content):
             return
         appearances = 0
         warning_present = False
@@ -49,15 +49,22 @@ class SpamModule(Module):
                 if attachment.width:
                     img = Image.open(f)
                     attachment_hash = imagehash.dhash(img)
+                    hash_type = "Image Hash"
                 else:
                     m = hashlib.sha256()
                     m.update(f.getbuffer())
                     attachment_hash = m.hexdigest()
+                    hash_type = "SHA256"
 
                 attachments.append(attachment_hash)
                 AttachmentHash(message_id=message.id, datetime=message.created_at, hash=attachment_hash).save(force_insert=True)
                 print(attachment.url, attachment_hash)
                 f.close()
+
+                if "!hash" in message.content:
+                    await message.channel.send("{} of {}\n{}".format(hash_type, attachment.url, attachment_hash))
+            if message.channel.permissions_for(message.author).administrator:
+                return
 
             filter = AttachmentHash.hash == attachments[0]
             for img_hash in attachments[1:]:
@@ -94,7 +101,7 @@ class SpamModule(Module):
                     await message.channel.send(warning_msg)
             return True
 
-    @add_event_handler(1001)
+    @add_event_handler(1100)
     async def on_message(self, message):
         if await self.ratelimit(message):
             return True
